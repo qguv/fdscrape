@@ -3,25 +3,24 @@
 """fdscrape, an F-droid source code scraper
 
 Usage:
-  fdscrape.py [-v] [-l LOGFILE] --all DOWNLOAD_PATH
+  fdscrape.py [-v] [-l LOGFILE] [--only APP_NAME] DOWNLOAD_PATH
   fdscrape.py (-h | --help | help)
   fdscrape.py --version
 
 Options:
-  --all      Scrape all applications on F-droid.org
-  -h --help  Show this screen.
-  -v         Increase verbosity.
-  -l         Log output to a file.
-  --version  Display version.
+  --only APP_NAME  Only download a certain app by name.
+  -l LOGFILE       Log output to a file.
+  -v               Increase verbosity.
+  -h --help        Show this screen.
+  --version        Display version.
 
 fdscrape is written in Python 3 by Quint Guvernator and licensed by the GPLv3.
 """
 
 VERSION = "0.1.0"
 FDROID_BROWSE_URL = "https://f-droid.org/repository/browse/"
-DEFAULT_DOWNLOAD_PATH = path
 
-import os
+import os, sys
 import urllib.request
 from bs4 import BeautifulSoup as bs
 from docopt import docopt
@@ -33,10 +32,19 @@ def addLogLevel(logfn):
     return lambda x: logfn('\t' + x)
 
 
-def downloadFile(url, filename):
-    print(url)
-    with urllib.request.urlopen(url, timeout=10) as response, open(filename, 'wb') as outFile:
-        shutil.copyfileobj(response, outFile)
+def downloadFile(url, filename, log=lambda x: None):
+    log("Downloading \"{}\"".format(filename.name))
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response, filename.open('xb') as outFile:
+            shutil.copyfileobj(response, outFile)
+            log("Done.")
+    except FileExistsError:
+        log("Path {} already exists, skipping...".format(filename))
+    except KeyboardInterrupt:
+        log("User killed program, removing partially downloaded file...")
+        os.remove(filename.as_posix())
+        log("Done. Exiting...")
+        sys.exit(1)
 
 
 def getAppLinks(url, log=lambda x: None):
@@ -92,10 +100,22 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
         appLinks, names, nextUrl = getAppLinks(nextUrl, log=addLogLevel(log))
         log("Got page {}".format(page))
         for appLink, name in zip(appLinks, names):
+            safename = ''
+            for c in name:
+                if c.isalnum():
+                    safename += c.lower()
+                elif c.isspace():
+                    safename += '_'
+            safename += ".tar.gz"
+            downloadFilename = pathlib.Path(downloadPath) / safename
+            if downloadFilename.exists():
+                log("\tPath {} already exists, skipping download...".format(downloadFilename))
+                continue
+            log('')
+            log("\tGetting remote link to source...")
             downloadLink = getDownloadLink(appLink, log=addLogLevel(log))
-            log("Downloading \"{}\"".format(name))
-            downloadFile(downloadLink, downloadPath / name)
-        log("Downloaded {} pages of apps".format(page))
+            downloadFile(downloadLink, pathlib.Path(downloadPath) / safename, log=addLogLevel(log))
+    log("Downloaded {} pages of apps".format(page))
 
 
 if __name__ == "__main__":
@@ -104,7 +124,7 @@ if __name__ == "__main__":
     # command-line errors
     if args["-v"] and args["-l"]:
         print("select either logging or verbosity, not both")
-        os.exit(2)
+        sys.exit(2)
 
     if args["-v"]:
         logfn = print
@@ -114,9 +134,13 @@ if __name__ == "__main__":
     else:
         logfn = lambda x: None
 
-    if args["--all"]:
+    if not args["--only"]:
         downloadPath=pathlib.Path(args["DOWNLOAD_PATH"])
-        getAllApps(downloadPath=args["DOWNLOAD_PATH"], log=logfn)
+        try:
+            downloadPath.mkdir()
+        except FileExistsError:
+            pass
+        getAllApps(downloadPath, log=logfn)
 
     if args["-l"] and not args["-v"]:
         logFile.close()
