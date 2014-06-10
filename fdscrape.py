@@ -3,9 +3,9 @@
 """fdscrape, an F-droid source code scraper
 
 Usage:
-  fdscrape [-v] [-l FILE] --all
-  fscrape (-h | --help | help)
-  fscrape --version
+  fdscrape.py [-v] [-l FILE] --all
+  fdscrape.py (-h | --help | help)
+  fdscrape.py --version
 
 Options:
   --all      Scrape all applications on F-droid.org
