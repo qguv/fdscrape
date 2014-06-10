@@ -88,6 +88,8 @@ def getDownloadLink(url, log=lambda x: None):
     with urllib.request.urlopen(url) as r:
         soup = bs(r)
     link = soup.find('a', text="source tarball")
+    if link is None:
+        return
     return link.get("href")  # TODO
 
 
@@ -112,8 +114,13 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
                 log("\tPath {} already exists, skipping download...".format(downloadFilename))
                 continue
             log('')
-            log("\tGetting remote link to source...")
+            log("\tGetting remote link to source of \"{}\"...".format(name))
             downloadLink = getDownloadLink(appLink, log=addLogLevel(log))
+            if downloadLink is None:
+                log("\tNo source code available for \"{}\"from f-droid.org.")
+                log("\tConsider visiting the f-droid detail page manually at:")
+                log("\t\t{}".format(appLink))
+                continue
             downloadFile(downloadLink, pathlib.Path(downloadPath) / safename, log=addLogLevel(log))
     log("Downloaded {} pages of apps".format(page))
 
