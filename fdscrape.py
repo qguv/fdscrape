@@ -3,12 +3,11 @@
 """fdscrape, an F-droid source code scraper
 
 Usage:
-  fdscrape.py [-v] [-l LOGFILE] [--only APP_NAME] DOWNLOAD_PATH
+  fdscrape.py [-v] [-l LOGFILE] DOWNLOAD_PATH
   fdscrape.py (-h | --help | help)
   fdscrape.py --version
 
 Options:
-  --only APP_NAME  Only download a certain app by name.
   -l LOGFILE       Log output to a file.
   -v               Increase verbosity.
   -h --help        Show this screen.
@@ -91,7 +90,7 @@ def getDownloadLink(url, log=lambda x: None):
     link = soup.find('a', text="source tarball")
     if link is None:
         return
-    return link.get("href")  # TODO
+    return link.get("href")
 
 
 def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
