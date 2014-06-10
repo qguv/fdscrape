@@ -114,13 +114,13 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
             safename += ".tar.gz"
             downloadFilename = pathlib.Path(downloadPath) / safename
             if downloadFilename.exists():
-                log("\tPath {} already exists in {}, skipping download...".format(downloadFilename, args["DOWNLOAD_PATH"]))
+                log("\tPath {} already exists in {}, skipping download...".format(downloadFilename, downloadPath))
                 continue
             log('')
             log("\tGetting remote link to source of \"{}\"...".format(name))
             downloadLink = getDownloadLink(appLink, log=addLogLevel(log))
             if downloadLink is None:
-                log("\tNo source code available for \"{}\" from f-droid.org.")
+                log("\tNo source code available for \"{}\" from f-droid.org.".format(name))
                 log("\tConsider visiting the f-droid detail page manually at:")
                 log("\t\t{}".format(appLink))
                 log("\tand looking for the link to the source code.")
@@ -128,7 +128,7 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
                 continue
             downloadFile(downloadLink, pathlib.Path(downloadPath) / safename, log=addLogLevel(log))
     log('')
-    log("Downloaded {} pages of apps to {}".format(page, args["DOWNLOAD_PATH"]))
+    log("Downloaded {} pages of apps to {}".format(page, downloadPath))
 
 
 if __name__ == "__main__":
