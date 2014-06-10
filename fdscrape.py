@@ -74,12 +74,13 @@ def getAppLinks(url, log=lambda x: None):
     for n, l in zip(appNames, appLinks):
         log("Name: {}".format(n))
         log("Link: {}".format(l))
+        log('')
 
     nextLink = soup.find('a', text="next>")
     if nextLink is not None:
         nextLink = nextLink.get('href')
-    log("")
     log("Next page: {}".format(nextLink))
+    log('')
 
     return (appLinks, appNames, nextLink)
 
@@ -96,11 +97,13 @@ def getDownloadLink(url, log=lambda x: None):
 def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
     page = 0
     nextUrl = url
-    log("Getting page {}".format(page))
     while nextUrl is not None:
         page += 1
+        log("Scraping app index, page {}...".format(page))
         appLinks, names, nextUrl = getAppLinks(nextUrl, log=addLogLevel(log))
-        log("Got page {}".format(page))
+        log("Got page {}.".format(page))
+        log('')
+        log("Downloading source of all available apps on page {}...".format(page))
         for appLink, name in zip(appLinks, names):
             safename = ''
             for c in name:
@@ -111,18 +114,21 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
             safename += ".tar.gz"
             downloadFilename = pathlib.Path(downloadPath) / safename
             if downloadFilename.exists():
-                log("\tPath {} already exists, skipping download...".format(downloadFilename))
+                log("\tPath {} already exists in {}, skipping download...".format(downloadFilename, args["DOWNLOAD_PATH"]))
                 continue
             log('')
             log("\tGetting remote link to source of \"{}\"...".format(name))
             downloadLink = getDownloadLink(appLink, log=addLogLevel(log))
             if downloadLink is None:
-                log("\tNo source code available for \"{}\"from f-droid.org.")
+                log("\tNo source code available for \"{}\" from f-droid.org.")
                 log("\tConsider visiting the f-droid detail page manually at:")
                 log("\t\t{}".format(appLink))
+                log("\tand looking for the link to the source code.")
+                log('')
                 continue
             downloadFile(downloadLink, pathlib.Path(downloadPath) / safename, log=addLogLevel(log))
-    log("Downloaded {} pages of apps".format(page))
+    log('')
+    log("Downloaded {} pages of apps to {}".format(page, args["DOWNLOAD_PATH"]))
 
 
 if __name__ == "__main__":
@@ -148,6 +154,7 @@ if __name__ == "__main__":
         except FileExistsError:
             pass
         getAllApps(downloadPath, log=logfn)
+        log("Exiting...")
 
     if args["-l"] and not args["-v"]:
         logFile.close()
