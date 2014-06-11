@@ -54,7 +54,6 @@ def prefixFromLink(s):
     # get rid of page numbers
     if repoSuffix in s:
         s = s.rsplit(repoSuffix, maxsplit=1)[0]
-    print(s)
     return s
 
 
@@ -84,11 +83,6 @@ def getAppLinks(url, log=lambda x: None):
     appNames = [ b.find('p', recursive=False).find("span").string for b in appBlocks ]
     appLinks = [ b.parent.get('href') for b in appBlocks ]
     appPrefixes = [ prefixFromLink(l) for l in appLinks ]
-
-    for n, l in zip(appNames, appLinks):
-        log("Name: {}".format(n))
-        log("Link: {}".format(l))
-        log('')
 
     nextLink = soup.find('a', text="next>")
     if nextLink is not None:
