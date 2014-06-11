@@ -88,7 +88,6 @@ def getAppLinks(url, log=lambda x: None):
     if nextLink is not None:
         nextLink = nextLink.get('href')
     log("Next page: {}".format(nextLink))
-    log('')
 
     return (appLinks, appNames, appPrefixes, nextLink)
 
