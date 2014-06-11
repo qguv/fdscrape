@@ -179,7 +179,6 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
             if downloadFilename.exists():
                 log("\tPath {} already exists, skipping download...".format(downloadFilename))
                 continue
-            downloadFilename.mkdir()
 
             # save google play rating to a file (rating.txt) in the same path
             log("\tLooking for Google Play rating (as {})...".format(package))
@@ -194,6 +193,7 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
                 continue
             log("\tApp is rated \"{:.2}\" stars ({})".format(rating.average(), rating.distribution()))
             log('')
+            downloadFilename.mkdir()
             ratingFilename = downloadFilename / "rating.txt"
             log("\tSaving rating to file ({})...".format(ratingFilename))
             with ratingFilename.open('x') as f:
