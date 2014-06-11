@@ -193,7 +193,6 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
             if rating is None:
                 log("\tCouldn't find rating on the Google Play store.")
                 log("\tSkipping download...")
-                log('')
                 continue
             log("\tApp is rated \"{:.2}\" stars ({})".format(rating.average(), rating.distribution()))
             log('')
