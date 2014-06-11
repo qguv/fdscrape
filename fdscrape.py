@@ -126,7 +126,8 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
                 log('')
                 continue
             downloadFile(downloadLink, pathlib.Path(downloadPath) / safename, log=addLogLevel(log))
-    log('')
+        log("Page {} complete.".format(page))
+        log('')
     log("Downloaded {} pages of apps to {}".format(page, downloadPath))
 
 
@@ -146,14 +147,14 @@ if __name__ == "__main__":
     else:
         logfn = lambda x: None
 
-    if not args["--only"]:
-        downloadPath=pathlib.Path(args["DOWNLOAD_PATH"])
-        try:
-            downloadPath.mkdir()
-        except FileExistsError:
-            pass
-        getAllApps(downloadPath, log=logfn)
-        log("Exiting...")
+    downloadPath=pathlib.Path(args["DOWNLOAD_PATH"])
+    try:
+        downloadPath.mkdir()
+    except FileExistsError:
+        pass
+    getAllApps(downloadPath, log=logfn)
+    logfn('')
+    logfn("Exiting...")
 
     if args["-l"] and not args["-v"]:
         logFile.close()
