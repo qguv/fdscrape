@@ -119,9 +119,10 @@ class Rating:
         return sum(self.data)
 
     def average(self):
-        weighted = 0
+        if self.count() == 0:
+            return 0
 
-        # one-indexing
+        weighted = 0
         for i, x in enumerate(self.data):
             weighted += x * (i + 1)
         return weighted / self.count()
@@ -184,7 +185,11 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL, log=lambda x: None):
             log("\tLooking for Google Play rating (as {})...".format(package))
             rating = getPlayRating(package)
             if rating is None:
-                log("\tCouldn't find rating on the Google Play store.")
+                log("\tCouldn't find rating data on the Google Play store.")
+                log("\tSkipping download...")
+                continue
+            if rating.count() == 0:
+                log("\tFound rating data, but no users have rated this app on the Google Play store.")
                 log("\tSkipping download...")
                 continue
             log("\tApp is rated \"{:.2}\" stars ({})".format(rating.average(), rating.distribution()))
