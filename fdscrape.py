@@ -13,7 +13,7 @@ Options:
   -h --help        Show this screen.
   --version        Display version.
 
-fdscrape is written in Python 3 by Quint Guvernator and licensed by the GPLv3.
+fdscrape is written by Quint Guvernator and licensed by the GPLv3.
 """
 
 VERSION = "0.1.0"
