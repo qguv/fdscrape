@@ -24,9 +24,10 @@ from docopt import docopt
 import shutil
 import pathlib
 import json
+from subprocess import check_call
 
 
-def downloadFile(url, filename):
+def getPackage(url, filename):
     print("\tDownloading {} to {}".format(filename.name, filename.parent))
     try:
         with urllib.request.urlopen(url, timeout=10) as response, filename.open('xb') as outFile:
@@ -34,11 +35,26 @@ def downloadFile(url, filename):
         print("\tDone.")
     except FileExistsError:
         print("\tPath {} already exists, skipping...".format(filename))
+        return
     except KeyboardInterrupt:
         print("\tUser killed program, removing partially downloaded file...")
         os.remove(filename.as_posix())
         print("\tDone. Exiting...")
         sys.exit(1)
+
+    print("\tExtracting {}".format(filename))
+    check_call(["tar", "xf", str(filename), "-C", str(filename.parent)])
+
+    theDir = [ str(x) for x in filename.parent.glob("*/") if x.is_dir() ]
+    if len(theDir) != 1:
+        raise OSError("Too many directories in file!")
+    else:
+        theDir = theDir[0]
+
+    check_call(["mv", theDir, str(filename.parent / "src")])
+    check_call(["rm", str(filename)])
+
+    print("\tDone.")
 
 def prefixFromLink(s):
     repoPrefix = "https://f-droid.org/repository/browse/?fdid="
@@ -189,7 +205,7 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL):
             downloadFilename = downloadFilename / safename
 
             # download the file
-            downloadFile(downloadLink, downloadFilename)
+            getPackage(downloadLink, downloadFilename)
 
         print("Page {} complete.".format(page))
         print('')
