@@ -25,6 +25,7 @@ import shutil
 import pathlib
 import json
 from subprocess import check_call
+import string
 
 
 def getPackage(url, filename):
@@ -108,7 +109,16 @@ def getDownloadLink(url):
         return
     return link.get("href")
 
-def getPlayRating(package):
+def decodeSi(si: str) -> int:
+    prefixes = ['k', 'm', 'g', 't']
+    prefixes = { prefix: 10**(3 * (i + 1)) for i, prefix in enumerate(prefixes) }
+
+    for prefix, value in prefixes.items():
+        if si.lower.endswith(prefix):
+            si = float(si.partition(prefix)[0])
+        return int(si * value)
+
+def getPlayStats(package):
     prefix = "https://play.google.com/store/apps/details?id="
 
     try:
@@ -118,15 +128,19 @@ def getPlayRating(package):
         return
 
     hist = soup.find("div", class_="rating-histogram")
+
+    # if we don't have ratings, tell caller function to abort
     if hist is None:
         return
 
+    # pull ratings from soup
     ratings = hist(class_="rating-bar-container")
     ratings = [ r.find("span", class_="bar-number").text for r in ratings ]
     ratings = [ int(r.replace(',', '')) for r in ratings ]
     ratings.reverse() #  one-to-five in increasing order
     ratingCount = sum(ratings)
 
+    # if we don't have ratings, tell caller function to abort
     if ratingCount == 0:
         return
 
@@ -134,14 +148,46 @@ def getPlayRating(package):
     # this weight)
     ratingWeights = { i + 1: num for i, num in enumerate(ratings) }
 
+    # calculate the mean from the weighting dictionary above
     theSum = sum(( weight * count for weight, count in ratingWeights.items() ))
     theMean = theSum / ratingCount
 
     # make a str:int statistics dictionary
     stats = { "star_{}".format(k): v for k, v in ratingWeights.items() }
-    stats["star_mean"] = theMean
-    stats["star_count"] = ratingCount
+    stats["play_star_mean"] = theMean
+    stats["play_star_count"] = ratingCount
 
+    # count number of characters in the description as a control variable
+    description = soup.find("div", class_="id-app-orig-desc")
+    description = description.text
+    stats["play_description_length"] = len(description)
+
+    # how many users +1'd this app on Google Play?
+    plusOnes = soup.find(text=lambda x: "Recommend this on Google" in x)
+    plusOnes = plusOnes.partition(' ')[0] #FIXME
+    plusOnes = plusOnes.partition('+')[2]
+    stats["play_google_plus"] = plusOnes
+
+    # what sort of contact information does the developer provide?
+    contact = soup.find("div", class_="title", text="Contact Developer")
+    contact = contact.parent.find(class_="content contains-text-link")
+    availability = lambda x: "unavailable" if x is None else "available"
+
+    web = contact.find("a", text=lambda x: "Visit Developer's Website" in x)
+    stats["play_developer_web"] = availability(web)
+
+    email = contact.find("a", text=lambda x: "Email Developer" in x)
+    stats["play_developer_email"] = availability(email)
+
+    privacy = contact.find("a", text=lambda x: "Privacy Policy" in x)
+    stats["play_developer_privacy"] = availability(privacy)
+
+    # how large is this application?
+    size = soup.find("div", class_="title", text=lambda x: "Size" in x)
+    size = size.parent.find(class_="content")
+    stats["play_application_size"] = decodeSi(size.text.strip())
+
+    print("stats:", stats); input() #DEBUG
     return stats
 
 def getAllApps(downloadPath, url=FDROID_BROWSE_URL):
@@ -167,7 +213,7 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL):
 
             # save google play rating to a file (rating.json) in the same path
             print("\tLooking for Google Play rating (as {})...".format(package))
-            rating = getPlayRating(package)
+            rating = getPlayStats(package)
             if rating is None:
                 print("\tCouldn't find rating data on the Google Play store.")
                 print("\tSkipping download...")
