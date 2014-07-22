@@ -200,7 +200,7 @@ def getPlayStats(package):
     # application binary size
     rawSize = getPlayInfobox("Size", soup)
     if "Varies with device" in rawSize:
-        stats["play_size"] = "NA"
+        stats["play_size"] = None
     else:
         stats["play_size"] = decodeSi(getPlayInfobox("Size", soup))
 
