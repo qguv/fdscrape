@@ -25,7 +25,7 @@ import shutil
 import pathlib
 import json
 from subprocess import check_call
-import string
+import datetime
 
 
 def getPackage(url, filename):
@@ -113,10 +113,22 @@ def decodeSi(si: str) -> int:
     prefixes = ['k', 'm', 'g', 't']
     prefixes = { prefix: 10**(3 * (i + 1)) for i, prefix in enumerate(prefixes) }
 
-    for prefix, value in prefixes.items():
-        if si.lower.endswith(prefix):
-            si = float(si.partition(prefix)[0])
-        return int(si * value)
+    si = si.lower()
+
+    for prefix, multiplier in prefixes.items():
+        num, prefix, _ = si.partition(prefix)
+        if not prefix:
+            continue
+        num = num.replace(',', '')
+        num = float(num)
+        return int(num * multiplier)
+
+def getPlayInfobox(boxTitle: str, soup) -> str:
+    stat = soup.find("div", class_="title", text=lambda x: boxTitle in x)
+    stat = stat.parent.find(class_="content")
+
+    # TODO: handle potential error here
+    return stat.text.strip()
 
 def getPlayStats(package):
     prefix = "https://play.google.com/store/apps/details?id="
@@ -162,15 +174,18 @@ def getPlayStats(package):
     description = description.text
     stats["play_description_length"] = len(description)
 
+    # this doesn't work because it's injected into the source with jquery
+    '''
     # how many users +1'd this app on Google Play?
     plusOnes = soup.find(text=lambda x: "Recommend this on Google" in x)
     plusOnes = plusOnes.partition(' ')[0] #FIXME
     plusOnes = plusOnes.partition('+')[2]
     stats["play_google_plus"] = plusOnes
+    '''
 
     # what sort of contact information does the developer provide?
-    contact = soup.find("div", class_="title", text="Contact Developer")
-    contact = contact.parent.find(class_="content contains-text-link")
+    contact = soup.find("div", class_="title", text=lambda x: "Contact Developer" in x)
+    contact = contact.parent.find(class_=["content", "contains-text-link"])
     availability = lambda x: "unavailable" if x is None else "available"
 
     web = contact.find("a", text=lambda x: "Visit Developer's Website" in x)
@@ -182,12 +197,18 @@ def getPlayStats(package):
     privacy = contact.find("a", text=lambda x: "Privacy Policy" in x)
     stats["play_developer_privacy"] = availability(privacy)
 
-    # how large is this application?
-    size = soup.find("div", class_="title", text=lambda x: "Size" in x)
-    size = size.parent.find(class_="content")
-    stats["play_application_size"] = decodeSi(size.text.strip())
+    # application binary size
+    stats["play_size"] = decodeSi(getPlayInfobox("Size", soup))
 
-    print("stats:", stats); input() #DEBUG
+    # content rating
+    stats["play_content_rating"] = getPlayInfobox("Content Rating", soup)
+
+    # last updated
+    dateFormat = "%B %d, %Y"
+    lastUpdated = getPlayInfobox("Updated", soup)
+    lastUpdated = datetime.datetime.strptime(lastUpdated, dateFormat).date()
+    stats["play_updated"] = (datetime.date.today() - lastUpdated).days
+
     return stats
 
 def getAllApps(downloadPath, url=FDROID_BROWSE_URL):
