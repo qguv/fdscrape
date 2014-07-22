@@ -198,7 +198,11 @@ def getPlayStats(package):
     stats["play_developer_privacy"] = availability(privacy)
 
     # application binary size
-    stats["play_size"] = decodeSi(getPlayInfobox("Size", soup))
+    rawSize = getPlayInfobox("Size", soup)
+    if "Varies with device" in rawSize:
+        stats["play_size"] = "NA"
+    else:
+        stats["play_size"] = decodeSi(getPlayInfobox("Size", soup))
 
     # content rating
     stats["play_content_rating"] = getPlayInfobox("Content Rating", soup)
