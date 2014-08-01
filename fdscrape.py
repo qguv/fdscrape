@@ -109,6 +109,20 @@ def getDownloadLink(url):
         return
     return link.get("href")
 
+def combineDictionaries(*dictionaries) -> dict:
+    '''Combine dictionaries by adding keys.'''
+
+    keys = set()
+    for d in dictionaries:
+        keys = keys.union(d.keys())
+
+    newDict = dict()
+    for k in keys:
+        values = [ d.get(k, 0) for d in dictionaries ]
+        newDict[k] = sum(values)
+
+    return newDict
+
 def decodeSi(si: str) -> int:
     prefixes = ['k', 'm', 'g', 't']
     prefixes = { prefix: 10**(3 * (i + 1)) for i, prefix in enumerate(prefixes) }
@@ -129,6 +143,14 @@ def getPlayInfobox(boxTitle: str, soup) -> str:
 
     # TODO: handle potential error here
     return stat.text.strip()
+
+def reviewPhrases(text) -> dict:
+    '''Returns a dict with the amount of matching phrases.'''
+
+    keys = ["incompatible", "uninstall", "crash", "slow", "lag", "black screen",
+            "white screen", "blank screen"]
+    # s.count(sub) counts occurrances of sub in s
+    return { k.replace(' ', '-'): text.lower().count(k) for k in keys }
 
 def getPlayStats(package):
     prefix = "https://play.google.com/store/apps/details?id="
@@ -212,6 +234,30 @@ def getPlayStats(package):
     lastUpdated = getPlayInfobox("Updated", soup)
     lastUpdated = datetime.datetime.strptime(lastUpdated, dateFormat).date()
     stats["play_updated"] = (datetime.date.today() - lastUpdated).days
+
+    # category
+    # we're using the backend link because the frontend text on the Web display
+    # isn't specific enough and may change
+    catLink = soup.find("span", itemprop="genre").parent
+    catLink = catLink.get("href")
+    # it's the last part of the category link
+    catLink = catLink.rpartition('/')[2]
+    stats["play_category"] = catLink
+
+    # text reviews
+    reviews = soup.find("div", class_="reviews")
+    reviews = reviews.find("div", class_="all-reviews")
+    if reviews is not None:
+        reviews = reviews("div", class_="review-body")
+        reviews = [ " ".join(review.stripped_strings) for review in reviews ]
+        phrases = [ reviewPhrases(review) for review in reviews ]
+        phrases = combineDictionaries(*phrases)
+        wordCount = sum([ len(review.split(" ")) for review in reviews ])
+        stats["review_words"] = wordCount
+        for phrase, count in phrases.items():
+            stats["review_frequency_" + phrase] = count / wordCount
+    else:
+        print("No reviews!")
 
     return stats
 
