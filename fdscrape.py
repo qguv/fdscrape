@@ -21,33 +21,41 @@ fdscrape is written by Quint Guvernator and licensed by the GPLv3.
 VERSION = "0.1.0"
 FDROID_BROWSE_URL = "https://f-droid.org/repository/browse/"
 
-import os, sys
-import urllib.request
-from bs4 import BeautifulSoup
 from docopt import docopt
-import shutil
-import pathlib
-import json
 from subprocess import check_call
+from time import sleep
+from urllib.error import URLError, HTTPError
 import datetime
+import json
+import os, sys
+import pathlib
+import shutil
+import urllib.request
 
+from bs4 import BeautifulSoup
 def bs(*args, **kwargs):
     return BeautifulSoup(*args, "html.parser", **kwargs)
 
 def getFile(url, filename):
     print("\tDownloading {} to {}".format(filename.name, filename.parent))
-    try:
-        with urllib.request.urlopen(url, timeout=10) as response, filename.open('xb') as outFile:
-            shutil.copyfileobj(response, outFile)
-        print("\tDone.")
-    except FileExistsError:
-        print("\tPath {} already exists, skipping...".format(filename))
-        return
-    except KeyboardInterrupt:
-        print("\tUser killed program, removing partially downloaded file...")
-        os.remove(filename.as_posix())
-        print("\tDone. Exiting...")
-        sys.exit(1)
+    while True:
+        try:
+            with urllib.request.urlopen(url, timeout=10) as response, filename.open('xb') as outFile:
+                shutil.copyfileobj(response, outFile)
+            print("\tDone.")
+            return
+        except URLError:
+            sleep(5)
+            continue
+        except FileExistsError:
+            print("\tPath {} already exists, skipping...".format(filename))
+            return
+        except KeyboardInterrupt:
+            print("\tUser killed program, removing partially downloaded file...")
+            os.remove(filename.as_posix())
+            print("\tDone. Exiting...")
+            sys.exit(1)
+            return
 
 def getArchive(url, filename):
     getFile(url, filename)
@@ -76,6 +84,14 @@ def prefixFromLink(s):
         s = s.rsplit(repoSuffix, maxsplit=1)[0]
     return s
 
+def safeSoup(url):
+    while True:
+        try:
+            with urllib.request.urlopen(url, timeout=10) as r:
+                return bs(r)
+        except URLError:
+            sleep(5)
+
 def getAppLinks(url):
     '''Gets all app links on a page and returns the links as a list, their
     names as a list, the package names as a list, and the next page as a string (or None if it's over)
@@ -95,9 +111,7 @@ def getAppLinks(url):
      ["org.mozilla.app1", "com.ableton.app2"],
      None)
     '''
-    with urllib.request.urlopen(url) as r:
-        soup = bs(r)
-
+    soup = safeSoup(url)
     appBlocks = soup(id="appheader")
     appNames = [ b.find('p', recursive=False).find("span").string for b in appBlocks ]
     appLinks = [ b.parent.get('href') for b in appBlocks ]
@@ -111,9 +125,7 @@ def getAppLinks(url):
     return (appLinks, appNames, appPrefixes, nextLink)
 
 def getLink(url, text):
-    with urllib.request.urlopen(url) as r:
-        soup = bs(r)
-    link = soup.find('a', text=text)
+    link = safeSoup(url).find('a', text=text)
     if link is None:
         return
     return link.get("href")
@@ -165,9 +177,9 @@ def getPlayStats(package):
     prefix = "https://play.google.com/store/apps/details?id="
 
     try:
-        with urllib.request.urlopen(prefix + package) as r:
+        with urllib.request.urlopen(prefix + package, timeout=10) as r:
             soup = bs(r)
-    except urllib.error.HTTPError:
+    except HTTPError:
         return
 
     hist = soup.find("div", class_="rating-histogram")
