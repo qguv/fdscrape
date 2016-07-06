@@ -3,13 +3,17 @@
 """fdscrape, an F-droid source code scraper
 
 Usage:
-  fdscrape.py DOWNLOAD_PATH
-  fdscrape.py (-h | --help | help)
+  fdscrape.py [options] DOWNLOAD_PATH
+  fdscrape.py (-h | --help)
   fdscrape.py --version
 
 Options:
-  -h --help        Show this screen.
-  --version        Display version.
+  --no-extract   Don't extract source tarball.
+  --ratings      Scrape Google Play ratings (currently broken).
+  --require-apk  Abort if APK isn't available.
+  --require-src  Abort if source tarball isn't available.
+  -h --help      Show this screen.
+  --version      Display version.
 
 fdscrape is written by Quint Guvernator and licensed by the GPLv3.
 """
@@ -19,7 +23,7 @@ FDROID_BROWSE_URL = "https://f-droid.org/repository/browse/"
 
 import os, sys
 import urllib.request
-from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup
 from docopt import docopt
 import shutil
 import pathlib
@@ -27,8 +31,10 @@ import json
 from subprocess import check_call
 import datetime
 
+def bs(*args, **kwargs):
+    return BeautifulSoup(*args, "html.parser", **kwargs)
 
-def getPackage(url, filename):
+def getFile(url, filename):
     print("\tDownloading {} to {}".format(filename.name, filename.parent))
     try:
         with urllib.request.urlopen(url, timeout=10) as response, filename.open('xb') as outFile:
@@ -42,6 +48,9 @@ def getPackage(url, filename):
         os.remove(filename.as_posix())
         print("\tDone. Exiting...")
         sys.exit(1)
+
+def getArchive(url, filename):
+    getFile(url, filename)
 
     print("\tExtracting {}".format(filename))
     check_call(["tar", "xf", str(filename), "-C", str(filename.parent)])
@@ -101,10 +110,10 @@ def getAppLinks(url):
 
     return (appLinks, appNames, appPrefixes, nextLink)
 
-def getDownloadLink(url):
+def getLink(url, text):
     with urllib.request.urlopen(url) as r:
         soup = bs(r)
-    link = soup.find('a', text="source tarball")
+    link = soup.find('a', text=text)
     if link is None:
         return
     return link.get("href")
@@ -261,7 +270,7 @@ def getPlayStats(package):
 
     return stats
 
-def getAllApps(downloadPath, url=FDROID_BROWSE_URL):
+def getAllApps(downloadPath, url=FDROID_BROWSE_URL, ratings=True, require_apk=False, require_src=False, extract=True):
     page = 0
     nextUrl = url
     while nextUrl is not None:
@@ -283,46 +292,61 @@ def getAllApps(downloadPath, url=FDROID_BROWSE_URL):
                 continue
 
             # save google play rating to a file (rating.json) in the same path
-            print("\tLooking for Google Play rating (as {})...".format(package))
-            rating = getPlayStats(package)
-            if rating is None:
-                print("\tCouldn't find rating data on the Google Play store.")
-                print("\tSkipping download...")
-                continue
+            if ratings:
+                print("\tLooking for Google Play rating (as {})...".format(package))
+                rating = getPlayStats(package)
+                if rating is None:
+                    print("\tCouldn't find rating data on the Google Play store.")
+                    print("\tSkipping download...")
+                    continue
 
             print("\tMaking a directory for the application: {}...".format(downloadFilename))
             downloadFilename.mkdir()
-            ratingFilename = downloadFilename / "rating.json"
-            print("\tSaving rating to file ({})...".format(ratingFilename))
-            with ratingFilename.open('x') as f:
-                json.dump(rating, f)
-            print("\tDone.")
-            print('')
+            if ratings:
+                ratingFilename = downloadFilename / "rating.json"
+                print("\tSaving rating to file ({})...".format(ratingFilename))
+                with ratingFilename.open('x') as f:
+                    json.dump(rating, f)
+                print("\tDone.")
+                print('')
 
-            # get link to source
-            print("\tGetting remote link to source...")
-            downloadLink = getDownloadLink(appLink)
-            if downloadLink is None:
+            print("\tGetting remote link to apk...")
+            apkLink = getLink(appLink, "download apk")
+            if apkLink is None:
                 print("\tNo source code available for \"{}\" from f-droid.org.".format(name))
                 print("\tConsider visiting the f-droid detail page manually at:")
                 print("\t\t{}".format(appLink))
-                print("\tand looking for the link to the source code.")
-                print("\tSkipping download...")
+                print("\tand looking for the link to the apk.")
                 print('')
-                continue
+                if require_apk:
+                    print("\tSkipping...")
+                    continue
 
-            # calculate tar-gz filename
+            print("\tGetting remote link to source...")
+            srcLink = getLink(appLink, "source tarball")
+            if srcLink is None:
+                print("\tNo source code available for \"{}\" from f-droid.org.".format(name))
+                print("\tConsider visiting the f-droid detail page manually at:")
+                print("\t\t{}".format(appLink))
+                print("\tand looking for the link to the apk.")
+                print('')
+                if require_src:
+                    print("\tSkipping...")
+                    continue
+
+            # calculate filename
             safename = ''
             for c in name:
                 if c.isalnum():
                     safename += c.lower()
                 elif c.isspace():
                     safename += '_'
-            safename += ".tar.gz"
-            downloadFilename = downloadFilename / safename
 
-            # download the file
-            getPackage(downloadLink, downloadFilename)
+            # download the apk
+            getFile(apkLink, downloadFilename / (safename + ".apk") )
+
+            # download the source
+            (getArchive if extract else getFile)(srcLink, downloadFilename / (safename + ".tar.gz") )
 
         print("Page {} complete.".format(page))
         print('')
@@ -337,6 +361,11 @@ if __name__ == "__main__":
         downloadPath.mkdir()
     except FileExistsError:
         pass
-    getAllApps(downloadPath)
+
+    getAllApps(downloadPath,
+               ratings=args['--ratings'],
+               require_apk=args['--require-apk'],
+               require_src=args['--require-src'],
+               extract=not args['--no-extract'])
 
     print("\nExiting...")
